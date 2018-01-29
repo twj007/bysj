@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>canvas粒子效果</title>
+
+  </head>
+  <body>
+    <canvas id="root">您的浏览器不支持canvas， 请换个浏览器试试</canvas>
+  </body>
+  <script>
+      // 粒子动画对象
+      function CanvasAnimation(Dom, options) {
+        options = options || {},
+        this.Element = Dom;//绘制粒子的元素
+        this.cvs = Dom.getContext('2d');//获取canvas上下文
+        this.off_cvs = document.createElement('canvas');//创建绘制粒子的canvas
+        this.off_cvs.width = window.innerWidth;//粒子面板的宽度
+        this.off_cvs.height =  window.innerHeight;//粒子面板的高度
+        this.Dom = this.off_cvs.getContext('2d');//获取绘制粒子面板上下文
+        this.width = window.innerWidth;
+        this.height = window.innerWidth;
+        this.length = options.length || 100;//粒子个数
+        this.RoundColor = options.RoundColor || "#999";//粒子颜色
+        this.RoundDiameter = options.RoundDiameter || 2;//这是什么属性？
+        this.LineColor = options.LineColor || "#eee"//连线的颜色
+        this.Lineweight = options.Lineweight || 1;//连线的粗细
+        this.clicked = options.clicked || false;//是否触发点击事件（动画开关）
+        this.moveon = options.moveon || false;//鼠标移上去是否重新绘制
+        this.list = [];//粒子对象数组
+        this.pause = true;//暂停状态
+      };
+
+      CanvasAnimation.prototype.Run = function() {
+        //为root的点击事件绑定Clicked事件
+        if(this.clicked){
+          this.Element.addEventListener('click', this.Clicked.bind(this));
+        }
+        //为root的鼠标移动绑定moveXY， moveoutXY事件
+        if(this.moveon){
+          this.Element.addEventListener('mousemove', this.moveXY.bind(this));
+          this.Element.addEventListener('mouseout', this.moveoutXY.bind(this));
+        }
+        //绘制图形
+        this.Draw( this.getLength() );
+      }
+
+      //生成一百个随机粒子对象
+      CanvasAnimation.prototype.getLength = function() {
+        var arr = [];
+        for(var i= 0; i< this.length; i++){
+          var obj = {};
+          obj.x = parseInt( Math.random() * this.width )//x轴
+          obj.y = parseInt( Math.random() * this.height )//y轴
+          obj.r = parseInt( Math.random() * 10 ) || 1//粒子半径
+          obj.controlX = parseInt( Math.random() * 10 ) > 5  ? 'left' : 'right';//运动轨迹
+          obj.controlY = parseInt( Math.random() * 10 ) > 5  ? 'bottom' : 'top';//运动轨迹
+          arr.push(obj);
+        }
+        return arr;
+      }
+
+      //绘制粒子
+      CanvasAnimation.prototype.Draw = function(list){
+
+        var new_arr = [];//新粒子数组
+        var line_arr = []//线数组
+
+        //???
+        list.map( function(item, index){
+          var xy = this.ControlXY(item);//线的运动轨迹
+          var obj = this.ControlRound(xy);//圆点的运动轨迹
+          new_arr.push(obj);
+        });
+
+        //生成连线点坐标
+        new_arr.map(function(item1, index1){
+          new_arr.map(function(item2, index2){
+            if(item1 !== item2){
+              var x = item1.x - item2.x;
+              var y = item2.y - item2.y;
+              if( Math.abs(x)< 100 && Math.abs(y)< 100){
+                //连线两点坐标
+                var obj = {
+                  x1: item1.x,
+                  y1: item1.y,
+                  x2: item2.x,
+                  y2: item2.y
+                };
+                line_arr.push(obj);
+              }
+            }
+          });
+        });
+        //绘制线
+        this.drawLine(line_arr);
+        //绘制圆
+        new_arr.map(function(item){
+          this.drawRound(item);
+        });
+
+        this.list = new_arr;
+        //绘制面板到root上
+        this.cvs.drawImage(this.off_cvs, 0, 0, this.width, this.height);
+
+        setTimeout(function(){
+          if(this.pause){
+            this.next();
+          }
+        } , 50);
+      }
+
+      //定时刷新
+      CanvasAnimation.prototype.next = function(){
+        this.cvs.clearRect( 0, 0, this.width, this.height );
+        this.Dom.clearRect( 0, 0, this.width, this.height );
+        this.Draw( this.list );
+      }
+
+      //画线
+      CanvasAnimation.prototype.drawLine = function(list){
+        var Dom = this.Dom;
+        list.map(function(item){
+          Dom.beginPath();
+          Dom.moveTo( item.x1, item.y1 );
+          Dom.lineTo( item.x2, item.y2 );
+          Dom.lineWidth = this.Lineweight;
+          Dom.strokeStyle = this.LineColor;
+          Dom.closePath();
+        });
+      }
+
+      //控制运动轨迹
+      CanvasAnimation.prototype.ControlXY = function(obj){
+        if( obj.x >= (this.width - obj.r) ){
+          obj.controlX = 'left';
+        }else if( obj.x <= parseInt(obj.r/2) ){
+          obj.xontrolX = 'right';
+        }
+
+        if( obj.y >= (this.height - obj.r) ){
+          obj.controlY = 'bottom';
+        }else if( obj.y <= parseInt(obj.r/2)){
+          obj.controlY = 'top';
+        }
+        return obj;
+      }
+      //控制粒子
+      CanvasAnimation.prototype.ControlRound = function(obj){
+        switch(obj.controlX){
+          case 'right':
+            obj.x ++;//
+            break;
+          case 'left':
+            obj.x--;
+            break;
+        }
+        switch(obj.controlY){
+          case 'bottom':
+            obj.y--;
+            break;
+          case 'top':
+            obj.y++;
+            break;
+        }
+        return obj;
+      }
+      //点击事件 点击在点击出生成一个新的粒子
+      CanvasAnimation.prototype.Clicked = function(event){
+        var obj = {};
+        obj.x = event.clientX;
+        obj.y = event.clientY;
+        obj.r = parseInt( Math.random() * 10 );
+        obj.controlX = parseInt( Math.random() * 10 > 5 ? 'left' : 'right' );
+        obj.controlY = parseInt( Math.random() * 10 > 5 ? 'bottom' : 'top' );
+        this.list.push(obj);
+      }
+      //鼠标移动事件
+      CanvasAnimation.prototype.moveXY = function(event){
+        var obj = {};
+        obj.x = event.clientX;
+        obj.y = event.clientY;
+        obj.r = 0;
+        obj.move = true;
+        if( this.list[0]["move"]){
+          this.list[0]["x"] = obj.x;
+          this.list[0]["y"] = obj.y;
+          this.list[0]["r"] = 1
+        }else{
+          this.list.unshift(obj);//向数组头部添加一个元素
+        }
+      }
+      //鼠标移出事件
+      CanvasAnimation.prototype.moveoutXY = function(event){
+        this.list.shift();//删除list的第一个元素
+      }
+      //是否刷新
+      CanvasAnimation.prototype.pause = function(){
+        this.pause = !this.pause;
+        //重新绘制
+        if(this.pause){
+          this.Draw(this.list);
+        }
+      }
+
+      //创建并开始动画
+      var root = document.getElementById("root");
+      var a = new CanvasAnimation(root, {});
+      a.Run();
+
+      // var singleton = function(name) {
+      //   this.name = name;
+      //   this.instance = null;
+      // }
+      // function getInstance(name) {
+      //   if(!this.instance){
+      //     console.log('construct');
+      //     this.instance = new singleton(name);
+      //   }
+      //   return this.instance;
+      // }
+      // var newInstance = getInstance('aa');
+      // getInstance('bb');//将不会再创建对象
+      // console.log(newInstance.name);
+
+      // var createWindow = (function createWindow() {
+      //   var div;
+      //   console.log('init');
+      //   return function() {
+      //     if(!div){
+      //       div = document.createElemenet('div');
+      //       div.innerHtml = '弹窗';
+      //       div.style.display = 'none';
+      //       document.body.getElementById('Id').appendChild(div);
+      //     }
+      //     return div;
+      //   }
+      // })();
+      //
+      // document.getElementById('Id').onclick = function() {
+      //   var win = createWindow;
+      //   win.style.display = "block";
+      // }
+
+      //动态代理aop
+      // var people = function(age){
+      //     this.age = age;
+      //     this.ask = function(){
+      //       console.log('how old are you');
+      //     };
+      //     this.tell = function(){
+      //       console.log('i\'m '+this.age+' years old');
+      //     }
+      //
+      //     return {
+      //       age: this.age,
+      //       ask: this.ask,
+      //       tell: this.tell
+      //     };
+      // }
+      // var func = function(originalFunc){
+      //     this.originalFunc = originalFunc;
+      //     (function before(){
+      //       console.log('before');
+      //     })();
+      //     if(this.originalFunc){
+      //       originalFunc();
+      //     }
+      //     (function after(){
+      //       console.log('after');
+      //     })();
+      //
+      // }
+      //
+      // var p = new people(21);
+      // func(p.ask);
+
+
+      // var order10 = function(orderType, isPay){
+      //   if(orderType == 1 && isPay){
+      //     console.log('1');
+      //   }else if(isPay){
+      //     order100(orderType, isPay);
+      //   }else{
+      //     console.log('fail');
+      //   }
+      // }
+      // var order100 = function(orderType, isPay){
+      //   if(orderType == 100 && isPay){
+      //     console.log('100');
+      //   }else{
+      //     console.log('fail');
+      //   }
+      // }
+      //
+      // order10(100, true);
+  </script>
+</html>
